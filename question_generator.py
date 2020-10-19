@@ -151,7 +151,7 @@ class Question_Generator():
 
         if np.mod(epoch, 25) == 0:
             print(f"Epoch {epoch} is done. Saving the model ... ")
-        self.save_model(epoch)
+            self.save_model(epoch)
 
     def test(self, test_image_path, model_path, maxlen):
         ixtoword = self.dataset['ix_to_word'] 
