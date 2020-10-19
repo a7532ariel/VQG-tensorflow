@@ -1,6 +1,30 @@
 # Visual Question Generation in Tensorflow
 It's simple question generator based on visual content written in Tensorflow. The model is quite similar to GRNN in ***[Generating Natural Questions About an Image](https://arxiv.org/abs/1603.06059)*** but I use LSTM instead of GRU. It's quite similar to Google's new AI assistant [***Allo***](https://play.google.com/store/apps/details?id=com.google.android.apps.fireball&hl=zh_HK) which can ask question based on image content. Since Mostafazadeh et al. does not released VQG dataset yet, we will use VQA dataset temporarily.
 
+## Update
+CUDA 10.0, Python3.6, Miniconda
+* preprocess
+    from https://filebox.ece.vt.edu/~jiasenlu/codeRelease/vqaRelease/train_only/data_train_val.zip
+    * put `data_prepro.json`, `data_img.h5`, `data_prepro.h5` in root directory
+* train
+Since the author didn't provide the lstm model, we have to train from scratch.
+    * setting env
+    ```lang-sh
+    conda create --name tf python=3.6 tensorflow-gpu==1.13.1
+    conda activate tf
+    pip show tensorflow-gpu // should be 1.13.1
+    pip install -r requirements.txt // version of keras should be compatible with tf
+    ```
+    * [modify code](https://github.com/chingyaoc/VQG-tensorflow/issues/3#issuecomment-626094127) so that we can run under tf1.x, python3.6
+    * replace the vgg19.py using https://github.com/machrisaa/tensorflow-vgg/blob/master/vgg19.py
+    * [download vgg pretrained model](https://github.com/machrisaa/tensorflow-vgg) and put it  in root directory
+    * train model `python main.py --model_path=./models/`
+* eval
+    * `python main.py --is_train=False --test_image_path=assets/demo.jpg --test_model_path=./models/model-0`
+
+
+
+
 ## Requirement
 - Tensorflow, follow the [official installation](https://www.tensorflow.org/versions/r0.10/get_started/os_setup.html#download-and-setup)
 - python 2.7

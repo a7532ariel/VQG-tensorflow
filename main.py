@@ -3,13 +3,12 @@ import math
 import os
 import tensorflow as tf
 import numpy as np
-import cPickle
 import skimage
 import pprint
 import tensorflow.python.platform
 from keras.preprocessing import sequence
 from data_loader import *
-import vgg19
+import vggtf
 import question_generator
 
 flags = tf.app.flags
@@ -30,7 +29,7 @@ tf.app.flags.DEFINE_integer('dim_hidden', 512, 'hidden size')
 tf.app.flags.DEFINE_integer('dim_image', 4096, 'dimension of output from fc7')
 tf.app.flags.DEFINE_integer('img_norm', 1, 'do normalization on image or not')
 tf.app.flags.DEFINE_integer('maxlen', 26, 'max length of question')
-tf.app.flags.DEFINE_integer('n_epochs', 250, 'how many epochs are we going to train')
+tf.app.flags.DEFINE_integer('n_epochs', 1, 'how many epochs are we going to train')
 tf.app.flags.DEFINE_float('learning_rate', '0.001', 'learning rate for adam')
 tf.app.flags.DEFINE_float('momentum', 0.9, 'momentum for adam')
 tf.app.flags.DEFINE_boolean('is_train', 'True', 'momentum for adam')
@@ -38,17 +37,16 @@ tf.app.flags.DEFINE_boolean('is_train', 'True', 'momentum for adam')
 conf = flags.FLAGS
 
 def calc_gpu_fraction(fraction_string):
-  idx, num = fraction_string.split('/')
-  idx, num = float(idx), float(num)
+    idx, num = fraction_string.split('/')
+    idx, num = float(idx), float(num)
 
-  fraction = 1 / (num - idx + 1)
-  print " [*] GPU : %.4f" % fraction
-  return fraction
+    fraction = 1 / (num - idx + 1)
+    print("[*] GPU : %.4f" % fraction)
+    return fraction
 
 def main(_):
 
-    attrs = conf.__dict__['__flags']
-    pp(attrs)
+    pp(conf)
 
     dataset, img_feature, train_data = get_data(conf.input_json, conf.input_img_h5, conf.input_ques_h5, conf.img_norm)
 
@@ -59,10 +57,10 @@ def main(_):
 
         if conf.is_train:
             model.build_model()
-	    model.train()
-	else:
-	    model.build_generator()
-	    model.test(test_image_path=conf.test_image_path, model_path=conf.test_model_path, maxlen=26)
+            model.train()
+        else:
+            model.build_generator()
+            model.test(test_image_path=conf.test_image_path, model_path=conf.test_model_path, maxlen=26)
 
 if __name__ == '__main__':
     tf.app.run()

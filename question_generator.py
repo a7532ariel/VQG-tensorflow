@@ -4,27 +4,28 @@ import numpy as np
 import tensorflow.python.platform
 from keras.preprocessing import sequence
 from data_loader import *
-import vgg19
+# import vgg19
+import vggtf
 
 class Question_Generator():
     def __init__(self, sess, conf, dataset, img_feature, train_data):
-	self.sess = sess
-	self.dataset = dataset
-	self.img_feature = img_feature
-	self.train_data = train_data
+        self.sess = sess
+        self.dataset = dataset
+        self.img_feature = img_feature
+        self.train_data = train_data
         self.dim_image = conf.dim_image
         self.dim_embed = conf.dim_embed
         self.dim_hidden = conf.dim_hidden
         self.batch_size = conf.batch_size
-	self.maxlen = conf.maxlen
+        self.maxlen = conf.maxlen
         self.n_lstm_steps = conf.maxlen+2
         self.model_path = conf.model_path
-	if conf.is_train:
-	    self.n_epochs = conf.n_epochs
-	    self.learning_rate = conf.learning_rate
+        if conf.is_train:
+            self.n_epochs = conf.n_epochs
+            self.learning_rate = conf.learning_rate
 
-	self.num_train = train_data['question'].shape[0] # total number of data
-	self.n_words = len(dataset['ix_to_word'].keys()) # vocabulary_size
+        self.num_train = train_data['question'].shape[0] # total number of data
+        self.n_words = len(dataset['ix_to_word'].keys()) # vocabulary_size
 
         # word embedding
         self.Wemb = tf.Variable(tf.random_uniform([self.n_words, self.dim_embed], -0.1, 0.1), name='Wemb')
@@ -48,7 +49,7 @@ class Question_Generator():
 
         image_emb = tf.nn.xw_plus_b(self.image, self.encode_img_W, self.encode_img_b)        # (batch_size, dim_hidden)
 
-	state = self.lstm.zero_state(self.batch_size,tf.float32)
+        state = self.lstm.zero_state(self.batch_size,tf.float32)
         loss = 0.0
         with tf.variable_scope("RNN"):
             for i in range(self.n_lstm_steps): 
@@ -63,16 +64,17 @@ class Question_Generator():
 
                 if i > 0:
                     # ground truth
-                    labels = tf.expand_dims(self.question[:, i], 1) 
+                    labels = tf.expand_dims(self.question[:, i], 1)
                     indices = tf.expand_dims(tf.range(0, self.batch_size, 1), 1)
-                    concated = tf.concat(1, [indices, labels])
+                    concated = tf.concat([indices, labels], 1)
+
                     onehot_labels = tf.sparse_to_dense(
-                            concated, tf.pack([self.batch_size, self.n_words]), 1.0, 0.0) 
+                            concated, tf.stack([self.batch_size, self.n_words]), 1.0, 0.0) 
 
                     # predict word
                     logit_words = tf.nn.xw_plus_b(output, self.embed_word_W, self.embed_word_b) 
 
-                    cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logit_words, onehot_labels)
+                    cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=logit_words, labels=onehot_labels)
                     cross_entropy = cross_entropy * self.mask[:,i]                             
 
                     current_loss = tf.reduce_sum(cross_entropy)
@@ -84,7 +86,7 @@ class Question_Generator():
         self.image = tf.placeholder(tf.float32, [1, self.dim_image]) # only one image
         image_emb = tf.nn.xw_plus_b(self.image, self.encode_img_W, self.encode_img_b)
 
-        state = tf.zeros([1, self.lstm.state_size])
+        state = self.lstm.zero_state(1,dtype=np.float32)
         self.generated_words = []
 
         with tf.variable_scope("RNN"):
@@ -131,7 +133,7 @@ class Question_Generator():
                 current_question_matrix = np.hstack( [np.full( (len(current_question_matrix),1), 0), current_question_matrix] ).astype(int)
 
                 current_mask_matrix = np.zeros((current_question_matrix.shape[0], current_question_matrix.shape[1]))
-                nonzeros = np.array( map(lambda x: (x != 0).sum()+2, current_question_matrix ))
+                nonzeros = np.array( list(map(lambda x: (x != 0).sum()+2, current_question_matrix )))
                 #  +2 -> #START# and '.'
 
                 for ind, row in enumerate(current_mask_matrix):
@@ -144,21 +146,22 @@ class Question_Generator():
                     })
 
                 if np.mod(counter, 100) == 0:
-                    print "Epoch: ", epoch, " batch: ", counter ," Current Cost: ", loss_value
+                    print(f"Epoch: {epoch}, batch: {counter}, Current Cost: {loss_value}")
                 counter = counter + 1
 
-	    if np.mod(epoch, 25) == 0:
-                print "Epoch ", epoch, " is done. Saving the model ... "
-		self.save_model(epoch)
+        if np.mod(epoch, 25) == 0:
+            print(f"Epoch {epoch} is done. Saving the model ... ")
+        self.save_model(epoch)
 
     def test(self, test_image_path, model_path, maxlen):
-	ixtoword = self.dataset['ix_to_word'] 
+        ixtoword = self.dataset['ix_to_word'] 
 
         images = tf.placeholder("float32", [1, 224, 224, 3])
 
         image_val = read_image(test_image_path)
 
-        vgg = vgg19.Vgg19()
+        # vgg = vgg19.Vgg19()
+        vgg = vggtf.Vgg19()
         with tf.name_scope("content_vgg"):
             vgg.build(images)
 
@@ -177,9 +180,9 @@ class Question_Generator():
              word = ixtoword[str(x)]
              generated_sentence = generated_sentence + ' ' + word
 
-        print ' '
-        print '--------------------------------------------------------------------------------------------------------'
-        print generated_sentence
+        print(' ')
+        print('--------------------------------------------------------------------------------------------------------')
+        print(generated_sentence)
 
     def save_model(self, epoch):
         if not os.path.exists(self.model_path):
