@@ -1,4 +1,5 @@
 import os
+import logging
 import tensorflow as tf
 import numpy as np
 import tensorflow.python.platform
@@ -6,6 +7,16 @@ from keras.preprocessing import sequence
 from data_loader import *
 # import vgg19
 import vggtf
+
+logging.basicConfig(format = '%(asctime)s - %(levelname)s - %(message)s',
+                    datefmt = '%m/%d/%Y %H:%M:%S',
+                    level = logging.INFO)
+output_file_handler = logging.FileHandler("test.log")
+stdout_handler = logging.StreamHandler(sys.stdout)
+
+logger = logging.getLogger(__name__)
+logger.addHandler(output_file_handler)
+logger.addHandler(stdout_handler)
 
 class Question_Generator():
     def __init__(self, sess, conf, dataset, img_feature, train_data):
@@ -146,12 +157,11 @@ class Question_Generator():
                     })
 
                 if np.mod(counter, 100) == 0:
-                    print(f"Epoch: {epoch}, batch: {counter}, Current Cost: {loss_value}")
+                    logger.info(f"Epoch: {epoch}, batch: {counter}, Current Cost: {loss_value}")
                 counter = counter + 1
 
-        if np.mod(epoch, 25) == 0:
-            print(f"Epoch {epoch} is done. Saving the model ... ")
-            self.save_model(epoch)
+            if np.mod(epoch, 5) == 0:
+                self.save_model(epoch)
 
     def test(self, test_image_path, model_path, maxlen):
         ixtoword = self.dataset['ix_to_word'] 
@@ -187,4 +197,5 @@ class Question_Generator():
     def save_model(self, epoch):
         if not os.path.exists(self.model_path):
             os.makedirs(self.model_path)
+        logger.info(f"Epoch {epoch} is done. Saving the model ... ")
         self.saver.save(self.sess, os.path.join(self.model_path, 'model'), global_step=epoch)
