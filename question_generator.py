@@ -11,7 +11,7 @@ import vggtf
 logging.basicConfig(format = '%(asctime)s - %(levelname)s - %(message)s',
                     datefmt = '%m/%d/%Y %H:%M:%S',
                     level = logging.INFO)
-output_file_handler = logging.FileHandler("test.log")
+output_file_handler = logging.FileHandler("default_set.log")
 stdout_handler = logging.StreamHandler(sys.stdout)
 
 logger = logging.getLogger(__name__)
@@ -94,21 +94,22 @@ class Question_Generator():
             self.loss = loss / tf.reduce_sum(self.mask[:,1:])
 
     def build_generator(self):
-        self.image = tf.placeholder(tf.float32, [1, self.dim_image]) # only one image
+        self.image = tf.placeholder(tf.float32, [None, self.dim_image])
         image_emb = tf.nn.xw_plus_b(self.image, self.encode_img_W, self.encode_img_b)
-
-        state = self.lstm.zero_state(1,dtype=np.float32)
+        batch_size = tf.shape(self.image)[0]
+        
+        state = self.lstm.zero_state(batch_size, dtype=np.float32)
         self.generated_words = []
 
         with tf.variable_scope("RNN"):
             output, state = self.lstm(image_emb, state)
-            last_word = tf.nn.embedding_lookup(self.Wemb, [0]) + self.bemb
+            last_word = tf.nn.embedding_lookup(self.Wemb, tf.tile([0],[batch_size])) + self.bemb
 
             for i in range(self.maxlen):
                 tf.get_variable_scope().reuse_variables()
 
                 output, state = self.lstm(last_word, state)
-
+                
                 logit_words = tf.nn.xw_plus_b(output, self.embed_word_W, self.embed_word_b)
                 max_prob_word = tf.argmax(logit_words, 1)
 
@@ -166,9 +167,11 @@ class Question_Generator():
     def test(self, test_image_path, model_path, maxlen):
         ixtoword = self.dataset['ix_to_word'] 
 
-        images = tf.placeholder("float32", [1, 224, 224, 3])
-
+        # 這邊傳image的batch
         image_val = read_image(test_image_path)
+        image_val = np.vstack((image_val, image_val)) 
+
+        images = tf.placeholder("float32", [image_val.shape[0], 224, 224, 3])
 
         # vgg = vgg19.Vgg19()
         vgg = vggtf.Vgg19()
@@ -181,18 +184,22 @@ class Question_Generator():
         saver.restore(self.sess, model_path)
 
         generated_word_index = self.sess.run(self.generated_words, feed_dict={self.image:fc7})
-        generated_word_index = np.hstack(generated_word_index)
+        generated_word_index = np.vstack(generated_word_index)
 
-        generated_sentence = ''
-        for x in generated_word_index:
-             if x==0:
-               break
-             word = ixtoword[str(x)]
-             generated_sentence = generated_sentence + ' ' + word
+        generated_sentences = []
+        for col in range(generated_word_index.shape[1]):
+            c = generated_word_index[:, col]
+            generated_sentence = ''
+            for x in c:
+                if x==0:
+                    break
+                word = ixtoword[str(x)]
+                generated_sentence = generated_sentence + ' ' + word
+            generated_sentences.append(generated_sentence)
 
         print(' ')
         print('--------------------------------------------------------------------------------------------------------')
-        print(generated_sentence)
+        print(generated_sentences)
 
     def save_model(self, epoch):
         if not os.path.exists(self.model_path):
